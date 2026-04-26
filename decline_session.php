@@ -7,16 +7,30 @@ if (!isset($_SESSION['clinic_id'])) {
     exit();
 }
 
-$session_id = isset($_GET['session_id']) ? (int)$_GET['session_id'] : 0;
-
-if ($session_id > 0) {
-    $stmt = $conn->prepare("UPDATE sessions SET status='declined' WHERE session_id=?");
-    $stmt->bind_param('i', $session_id);
-    if (!$stmt->execute()) {
-        die("Error: " . $stmt->error);
-    }
+if (!isset($_GET['session_id']) || !is_numeric($_GET['session_id'])) {
+    die("Invalid session ID");
 }
 
-header("Location: ClinicDashboard.php");
+$session_id = intval($_GET['session_id']);
+$clinic_id = intval($_SESSION['clinic_id']);
+
+$stmt = $conn->prepare("
+    UPDATE sessions s
+    JOIN counsellors c ON s.counsellor_id = c.counsellor_id
+    SET s.status = 'declined'
+    WHERE s.session_id = ? AND c.clinic_id = ?
+");
+
+if (!$stmt) {
+    die("Query preparation failed: " . $conn->error);
+}
+
+$stmt->bind_param("ii", $session_id, $clinic_id);
+
+if (!$stmt->execute()) {
+    die("Database update failed: " . $stmt->error);
+}
+
+header("Location: clinic_dashboard.php");
 exit();
 ?>
