@@ -1,25 +1,36 @@
 <?php
 session_start();
-require 'clinic_db.php'; // use clinic db connection
+require 'clinic_db.php';
 
 if (!isset($_SESSION['clinic_id'])) {
     header("Location: clinic_login.php");
     exit();
 }
 
-$clinic_id = $_SESSION['clinic_id'];
+$clinic_id = intval($_SESSION['clinic_id']);
+$clinic_name = $_SESSION['clinic_name'] ?? 'Clinic';
 
-// Fetch all pending sessions for this clinic
 $stmt = $conn->prepare("
     SELECT 
-        s.session_id, s.session_time, s.session_type, s.status,
-        u.first_name AS user_first, u.last_name AS user_last,
-        c.first_name AS counsellor_first, c.last_name AS counsellor_last
+        s.session_id,
+        s.session_time,
+        s.session_type,
+        s.status,
+        u.first_name AS user_first,
+        u.last_name AS user_last,
+        c.first_name AS counsellor_first,
+        c.last_name AS counsellor_last
     FROM sessions s
     JOIN users u ON s.user_id = u.user_id
     JOIN counsellors c ON s.counsellor_id = c.counsellor_id
-    WHERE c.clinic_id = ? AND s.status='pending'
+    WHERE c.clinic_id = ? AND s.status = 'pending'
+    ORDER BY s.session_time ASC
 ");
+
+if (!$stmt) {
+    die("Query preparation failed: " . $conn->error);
+}
+
 $stmt->bind_param("i", $clinic_id);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -38,7 +49,6 @@ $result = $stmt->get_result();
     --danger:#dc2626;
     --dark:#1e293b;
     --border:#e5e7eb;
-    --bg:#f8fafc;
 }
 
 body {
@@ -69,6 +79,17 @@ body {
     margin:0;
 }
 
+.clinic-info {
+    text-align:right;
+}
+
+.clinic-info a {
+    color:#dc2626;
+    text-decoration:none;
+    font-size:13px;
+    font-weight:600;
+}
+
 table {
     width:100%;
     border-collapse:collapse;
@@ -97,6 +118,7 @@ tr:hover {
     text-decoration:none;
     font-weight:600;
     font-size:13px;
+    margin-right:6px;
 }
 
 .accept {
@@ -107,11 +129,6 @@ tr:hover {
 .decline {
     background:var(--danger);
     color:white;
-}
-
-.accept:hover,
-.decline:hover {
-    opacity:0.9;
 }
 
 .empty {
@@ -129,7 +146,10 @@ tr:hover {
 
     <div class="header">
         <h2>🏥 Pending Session Requests</h2>
-        <strong><?= $_SESSION['clinic_name'] ?></strong>
+        <div class="clinic-info">
+            <strong><?= htmlspecialchars($clinic_name) ?></strong><br>
+            <a href="logout.php">Logout</a>
+        </div>
     </div>
 
     <table>
@@ -142,29 +162,23 @@ tr:hover {
             <th>Action</th>
         </tr>
 
-        <?php if ($result->num_rows > 0): ?>
+        <?php if ($result && $result->num_rows > 0): ?>
             <?php while($row = $result->fetch_assoc()): ?>
             <tr>
-                <td><?= $row['session_id'] ?></td>
-                <td><?= $row['user_first'] . ' ' . $row['user_last'] ?></td>
-                <td><?= $row['counsellor_first'] . ' ' . $row['counsellor_last'] ?></td>
-                <td><?= $row['session_time'] ?></td>
-                <td><?= $row['session_type'] ?></td>
+                <td><?= htmlspecialchars($row['session_id']) ?></td>
+                <td><?= htmlspecialchars($row['user_first'] . ' ' . $row['user_last']) ?></td>
+                <td><?= htmlspecialchars($row['counsellor_first'] . ' ' . $row['counsellor_last']) ?></td>
+                <td><?= htmlspecialchars($row['session_time']) ?></td>
+                <td><?= htmlspecialchars($row['session_type']) ?></td>
                 <td class="actions">
-                    <a class="accept" href="accept_session.php?session_id=<?= $row['session_id'] ?>">
-                        Accept
-                    </a>
-                    <a class="decline" href="decline_session.php?session_id=<?= $row['session_id'] ?>">
-                        Decline
-                    </a>
+                    <a class="accept" href="accept_session.php?session_id=<?= urlencode($row['session_id']) ?>">Accept</a>
+                    <a class="decline" href="decline_session.php?session_id=<?= urlencode($row['session_id']) ?>">Decline</a>
                 </td>
             </tr>
             <?php endwhile; ?>
         <?php else: ?>
             <tr>
-                <td colspan="6" class="empty">
-                    No pending session requests
-                </td>
+                <td colspan="6" class="empty">No pending session requests</td>
             </tr>
         <?php endif; ?>
     </table>
