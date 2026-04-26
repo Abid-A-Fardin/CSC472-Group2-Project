@@ -1,28 +1,31 @@
 <?php
-require 'clinic_db.php';
 session_start();
+require 'clinic_db.php';
 
 $error = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $clinic_id = $_POST['clinic_id'];
-    $contact_info = $_POST['contact_info'];
+    $clinic_id = intval($_POST['clinic_id']);
+    $contact_info = trim($_POST['contact_info']);
 
     $stmt = $conn->prepare(
-        "SELECT * FROM clinics WHERE clinic_id = ? AND contact_info = ?"
+        "SELECT clinic_id, clinic_name, contact_info FROM clinics WHERE clinic_id = ? AND contact_info = ?"
     );
+
     $stmt->bind_param('is', $clinic_id, $contact_info);
     $stmt->execute();
     $result = $stmt->get_result();
 
     if ($result->num_rows === 1) {
         $row = $result->fetch_assoc();
-        $_SESSION['clinic_id'] = $row['clinic_id'];      // required for dashboard
-        $_SESSION['clinic_name'] = $row['clinic_name'];  // store clinic name
-        header("Location: ClinicDashboard.php");
+
+        $_SESSION['clinic_id'] = $row['clinic_id'];
+        $_SESSION['clinic_name'] = $row['clinic_name'];
+
+        header("Location: clinic_dashboard.php");
         exit();
     } else {
-        $error = "Invalid credentials";
+        $error = "Invalid Clinic ID or Contact Info";
     }
 }
 ?>
@@ -76,6 +79,7 @@ body {
 
 .login-card input {
     width:100%;
+    box-sizing:border-box;
     padding:12px;
     margin-bottom:15px;
     border-radius:8px;
@@ -119,7 +123,7 @@ body {
     <h2>🏥 Clinic Login</h2>
 
     <?php if (!empty($error)): ?>
-        <div class="error"><?= $error ?></div>
+        <div class="error"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
 
     <form method="POST">
